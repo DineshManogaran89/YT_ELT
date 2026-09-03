@@ -2,6 +2,8 @@ import json
 from urllib import request
 import requests
 
+from datetime import date
+
 import os 
 from dotenv import load_dotenv
 
@@ -34,7 +36,7 @@ def get_playlistId():
 
         channel_playlistId = channel_items["contentDetails"]["relatedPlaylists"]["uploads"]
 
-        print(channel_playlistId)
+        # print(channel_playlistId)
 
         return channel_playlistId
     
@@ -81,9 +83,9 @@ def get_video_ids(playlistId):
     except request.exceptions.RequestException as e:
         raise e
 
-    
+  
 
-def extract_video_stats(video_id):
+def extract_video_data(video_ids):
 
     extracted_data = []
 
@@ -94,9 +96,9 @@ def extract_video_stats(video_id):
     try:
 
         for batch in batch_list(video_ids, maxResults):
-            video_id_str = ",".join(batch)
+            video_ids_str = ",".join(batch)
 
-            url = f"https://youtube.googleapis.com/youtube/v3/videos?part=contentDetails&part=snippet&part=statistics&id={video_id_str}&key={API_KEY}"
+            url = f"https://youtube.googleapis.com/youtube/v3/videos?part=contentDetails&part=snippet&part=statistics&id={video_ids_str}&key={API_KEY}"
 
             response = requests.get(url)
 
@@ -107,29 +109,34 @@ def extract_video_stats(video_id):
             for item in data.get("items", []):
                 video_id = item["id"]
                 snippet = item["snippet"]
-                content_details = item["contentDetails"]
+                contentDetails = item["contentDetails"]
                 statistics = item["statistics"]
                 
                 video_data = {
                     "video_id": video_id,
                     "title": snippet["title"],
-                    "description": snippet["description"],
-                    "published_at": snippet["publishedAt"],
-                    "view_count": statistics.get("viewCount", None),
-                    "like_count": statistics.get("likeCount", None),
-                    "comment_count": item["statistics"].get("commentCount", None)
+                    "publishedAt": snippet["publishedAt"],
+                    "duration": contentDetails["duration"],
+                    "viewCount": statistics.get("viewCount", None),
+                    "likeCount": statistics.get("likeCount", None),
+                    "commentCount": statistics.get("commentCount", None)
                 }
                 extracted_data.append(video_data)
 
-        return data
+        return extracted_data
     
     except request.exceptions.RequestException as e:
         raise e
 
 
+def save_to_json(extracted_data):
+    file_path = F"./data/YT_data_{date.today()}.json"
+
+    with open(file_path, "w", encoding="utf-8") as json_outfile:
+        json.dump(extracted_data, json_outfile, indent=4, ensure_ascii=False)
 
 if __name__ == "__main__":
     playlistId = get_playlistId()
     video_ids = get_video_ids(playlistId)
-    # print(extract_video_stats(video_ids))
-    extract_video_stats(video_ids)
+    video_data=extract_video_data(video_ids)
+    save_to_json(video_data)
